@@ -23,15 +23,18 @@ int motorPin8 = 9;
 int xLimit = 10; //richtige pin Nummer setzen
 int yLimit = 11; //^
 int MAX_STEPS = 4096;
-
-Stepper mystepper(MAX_STEPS, motorPin1, motorPin2, motorPin3, motorPin4);
-
 Adafruit_MCP23X17 mcp;
 
 class motor : public Stepper{
   private:
   int speed = MOTOR_SPEED;
   public:
+  motor(int pin1, int pin2, int pin3, int pin4) : Stepper(4096, pin1, pin2, pin3, pin4){
+    
+  };
+  void test(int i){
+    step(i);
+  };
   int calibrate(){
     // kalibrieren
     while(!mcp.digitalRead(xLimit)){
@@ -53,11 +56,13 @@ class ldrGruppe{
 
     }
 };
+motor test(motorPin1,motorPin2,motorPin3,motorPin4);
+
 void setup() {
   Serial.begin(9600);
 
-  motor xMotor(4096, motorPin1, motorPin2, motorPin3, motorPin4);
-  motor yMotor(4096, motorPin5, motorPin6, motorPin7, motorPin8);
+  //motor xMotor(4096, motorPin1, motorPin2, motorPin3, motorPin4);
+  //motor yMotor(4096, motorPin5, motorPin6, motorPin7, motorPin8);
   ldrGruppe ldrOben;
   ldrGruppe ldrRechts;
   ldrGruppe ldrUnten;
@@ -69,10 +74,10 @@ void setup() {
 
   // configure pin for output
   mcp.pinMode(SUNRELAY_PIN, OUTPUT);
-  xMotor.calibrate();
-  yMotor.calibrate();
+  //xMotor.calibrate();
+  //yMotor.calibrate();
 }
 
 void loop() {
-
+  test.test(1);
 }
