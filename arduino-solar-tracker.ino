@@ -20,64 +20,93 @@ int motorPin6 = 7;
 int motorPin7 = 8;
 int motorPin8 = 9;
 
-int xLimit = 10; //richtige pin Nummer setzen
-int yLimit = 11; //^
-int MAX_STEPS = 4096;
+int xLimit = 1; //MCP ID GPB0
+int yLimit = 2; //^      GPB1
+int maxSteps = 4096;
+
 Adafruit_MCP23X17 mcp;
 
-class motor : public Stepper{
+class Motor : public Stepper{
   private:
-  int speed = MOTOR_SPEED;
+    int speed = MOTOR_SPEED;
+    int pos;
+    int limitPin;
   public:
-  motor(int pin1, int pin2, int pin3, int pin4) : Stepper(4096, pin1, pin2, pin3, pin4){
-    
-  };
-  void test(int i){
-    step(i);
-  };
-  int calibrate(){
-    // kalibrieren
-    while(!mcp.digitalRead(xLimit)){
-      mystepper.step(1);
+    Motor(int int1, int int2, int int3, int int4, int pin) : Stepper(maxSteps, int1, int2, int3, int4){
+      limitPin = pin;
+    };
+    void calibrate(){
+      Serial.println("Calibrating...");
+      do{
+        step(1);
+        delay(50);
+      }while(mcp.digitalRead(limitPin));
+      Serial.println("Calibrated!");
+      pos = 0;
+    };
+    void move(int i){
+      if(i>0){
+        for(i; i>0;i--){
+          step(1);
+          pos++;
+          delay(50);
+        }
+      }
+      else{
+        for(i; i<0;i++){
+          step(-1);
+          pos--;
+          delay(50);
+        }
+      }
     }
-    posStep = 0;
-    return posStep;
-  }
-  int posStep;
-  int posWinkel;
-  int step(int step){};
-  int cal(){};
+    void moveTo(int i){
+      i = i - pos;
+      move(i);
+    }
+    int getPos(){
+      return pos;
+    }
+    float getPosWinkel(){
+      return (float)pos / (float)maxSteps;
+    }
 };
 
 class ldrGruppe{
   private:
+    int ldrPin1;
+    int ldrPin2;
   public:
-    getStrenght(){
-
+    ldrGruppe(int ldr1, int ldr2){
+      ldrPin1 = ldr1;
+      ldrPin2 = ldr2;
+    };
+    float getStrenght(){
+      return analogRead(ldrPin1) / analogRead(ldrPin2);
     }
 };
-motor test(motorPin1,motorPin2,motorPin3,motorPin4);
+
+Motor xMotor(motorPin1, motorPin2, motorPin3, motorPin4, xLimit);
+Motor yMotor(motorPin5, motorPin6, motorPin7, motorPin8, yLimit);
+ldrGruppe ldrOben(A5,A4);
+ldrGruppe ldrRechts(A4,A3);
+ldrGruppe ldrUnten(A3,A2);
+ldrGruppe ldrLinks(A2,A5);
 
 void setup() {
   Serial.begin(9600);
-
-  //motor xMotor(4096, motorPin1, motorPin2, motorPin3, motorPin4);
-  //motor yMotor(4096, motorPin5, motorPin6, motorPin7, motorPin8);
-  ldrGruppe ldrOben;
-  ldrGruppe ldrRechts;
-  ldrGruppe ldrUnten;
-  ldrGruppe ldrLinks;
-  if (!mcp.begin_I2C()) {
+  /*if (!mcp.begin_I2C()) {
     Serial.println("Error.");
     while (1);
-  }
+  }*/
+  Serial.println("mcp begin");
 
   // configure pin for output
   mcp.pinMode(SUNRELAY_PIN, OUTPUT);
-  //xMotor.calibrate();
-  //yMotor.calibrate();
+  xMotor.calibrate();
+  yMotor.calibrate();
 }
 
 void loop() {
-  test.test(1);
+
 }
