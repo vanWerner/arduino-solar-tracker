@@ -9,20 +9,26 @@
 
 #define I2C_MULTI 0x20
 #define I2C_INA226 0x44
-//#define SUNRELAY_PIN 0
+#define SUNRELAY_PIN 4
 #define MOTOR_SPEED 2
-int motorPin1 = 2;
-int motorPin2 = 3;
-int motorPin3 = 4;
-int motorPin4 = 5;
-int motorPin5 = 6;
-int motorPin6 = 7;
-int motorPin7 = 8;
-int motorPin8 = 9;
+int xMotorPin1 = 2;
+int xMotorPin2 = 3;
+int xMotorPin3 = 4;
+int xMotorPin4 = 5;
+int yMotorPin1 = 6;
+int yMotorPin2 = 7;
+int yMotorPin3 = 8;
+int yMotorPin4 = 9;
+int sonnenMotorPin1 = 10;
+int sonnenMotorPin2 = 11;
+int sonnenMotorPin3 = 12;
+int sonnenMotorPin4 = 13;
 
-int xLimit = 0; //MCP ID GPB0
-int yLimit = 0; //^      GPB1
+int xLimit = 0; //MCP ID GPA0
+int yLimit = 1; //^      GPA1
+int sonnenLimit = 2; // GPA2
 int maxSteps = 4096;
+unsigned int moveBits[3] = {0, 0, 0};
 
 Adafruit_MCP23X17 mcp;
 
@@ -78,53 +84,69 @@ class Motor : public Stepper{
 
 class ldrGruppe{
   private:
-    int ldrPin1;
-    int ldrPin2;
+    int ldrPin1 = 0;
+    int ldrPin2 = 0;
   public:
-    ldrGruppe(int ldr1, int ldr2){
+    ldrGruppe(int ldr1, int ldr2, int* bits){
       ldrPin1 = ldr1;
       ldrPin2 = ldr2;
+      if(bits > 7){
+        Serial.println("Motor Bits sind mehr als 3 Bits");
+        return;
+      }
+      moveBits[0] = 7;
+      moveBits[1] = 7;
+      moveBits[2] = 7; //bitRead(bits, 0);
+      /*moveBits[1] = bitRead(bits, 1);
+      moveBits[2] = bitRead(bits, 2);*/
     };
     float getStrenght(){
       return analogRead(ldrPin1) / analogRead(ldrPin2);
     }
+    unsigned int getMotorBits(){
+      return moveBits;
+    }
+    
 };
 
 // Initialisieren der Instanzen
-Motor xMotor(motorPin1, motorPin2, motorPin3, motorPin4, xLimit);
-Motor yMotor(motorPin5, motorPin6, motorPin7, motorPin8, yLimit);
-ldrGruppe ldrOben(A5,A4);
-ldrGruppe ldrRechts(A4,A3);
-ldrGruppe ldrUnten(A3,A2);
-ldrGruppe ldrLinks(A2,A5);
+Motor xMotor(xMotorPin1, xMotorPin2, xMotorPin3, xMotorPin4, xLimit);
+Motor yMotor(yMotorPin1, yMotorPin2, yMotorPin3, yMotorPin4, yLimit);
+Motor sonne(sonnenMotorPin1, sonnenMotorPin2, sonnenMotorPin3, sonnenMotorPin4, sonnenLimit);
+ldrGruppe ldrOben(A5, A4, 2);
+ldrGruppe ldrRechts(A4, A3, 1);
+ldrGruppe ldrUnten(A3, A2, 6);
+ldrGruppe ldrLinks(A2, A5, 5);
 
 // Variablen zum Vergleich der Stärke der LDRs, werden auf null initialisiert
 ldrGruppe* strongestLDRptr = nullptr;
 float strongestStrenght = 0.0;
 
+void moveMotorByBit(){}
 void setup() {
   // Initialisieren von Serial und I2C
   Serial.begin(9600);
+  Serial.println("I2C begin");
   if (!mcp.begin_I2C()) {
     Serial.println("Error.");
     while (1);
   }
   Serial.println("mcp begin");
-  //mcp.pinMode(xLimit, INPUT_PULLUP);
+  mcp.pinMode(xLimit, INPUT_PULLUP);
   // configure pin for output
-  //mcp.pinMode(SUNRELAY_PIN, OUTPUT);
+  mcp.pinMode(SUNRELAY_PIN, OUTPUT);
+  
   xMotor.calibrate();
+  delay(1000);
   yMotor.calibrate();
 }
 
 void loop() {
-  Serial.println(mcp.digitalRead(xLimit));
-  delay(500);
-
   // setzte einen Pointer auf die Instanz von ldrGruppe die die größte Stärke aufweist
   // dabei wir ldrOben als erstes als größte festgehalten weil es noch nichts zum vergleiche gibt
   // über if statements wird dann die Stärkste Instanz ermittelt und als strongestStrenght gespeichert, sowie ein Pointer "strongestLDRptr" auf die Instanz gesetzt
-  strongestStrenght = ldrOben.getStrenght();
+  // TODO: Ändern auf kleinsten Wert
+  /*strongestStrenght = ldrOben.getStrenght();
   strongestLDRptr = &ldrOben;
   if(strongestStrenght < ldrRechts.getStrenght()){
     strongestStrenght = ldrRechts.getStrenght();
@@ -134,8 +156,12 @@ void loop() {
     strongestStrenght = ldrUnten.getStrenght();
     strongestLDRptr = &ldrUnten;
   }
-if(strongestStrenght < ldrLinks.getStrenght()){
+  if(strongestStrenght < ldrLinks.getStrenght()){
     strongestStrenght = ldrLinks.getStrenght();
     strongestLDRptr = &ldrLinks;
-  }
+  }*/
+  //unsigned int output[] = ldrOben.getMotorBits();
+  //Serial.println(output[1]);
+
+
 }
