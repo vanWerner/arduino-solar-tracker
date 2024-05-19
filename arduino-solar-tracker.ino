@@ -67,7 +67,6 @@ class Motor : public Stepper{
           pos++;
           delay(50);
         }
-        stop();
       }
       else{
         for(i; i<0;i++){
@@ -76,6 +75,7 @@ class Motor : public Stepper{
           delay(50);
         }
       }
+      stop();
     }
     void moveTo(int i){
       i = i - pos;
@@ -100,8 +100,9 @@ class ldrGruppe{
     int ldrPin1 = 0;
     int ldrPin2 = 0;
     int moveBits = 0;
+    int offset = 0;
   public:
-    ldrGruppe(int ldr1, int ldr2, int* bits){
+    ldrGruppe(int ldr1, int ldr2, int offsetValue, int* bits){
       ldrPin1 = ldr1;
       ldrPin2 = ldr2;
       if(bits > 7){
@@ -109,9 +110,10 @@ class ldrGruppe{
         return;
       }
       moveBits = bits;
+      offset = offsetValue;
     };
     int getStrenght(){
-      return int(analogRead(ldrPin1) / analogRead(ldrPin2));
+      return int((analogRead(ldrPin1) + analogRead(ldrPin2)) / 2 - offset);
     }
     unsigned int getMotorBits(){
       return moveBits;
@@ -123,10 +125,10 @@ class ldrGruppe{
 Motor xMotor(xMotorPin1, xMotorPin2, xMotorPin3, xMotorPin4, xLimit);
 Motor yMotor(yMotorPin1, yMotorPin2, yMotorPin3, yMotorPin4, yLimit);
 Motor sonne(sonnenMotorPin1, sonnenMotorPin2, sonnenMotorPin3, sonnenMotorPin4, sonnenLimit);
-ldrGruppe ldrOben(A5, A4, 2);
-ldrGruppe ldrRechts(A4, A3, 1);
-ldrGruppe ldrUnten(A3, A2, 6);
-ldrGruppe ldrLinks(A2, A5, 5);
+ldrGruppe ldrOben(A2, A3, 50, 3);
+ldrGruppe ldrRechts(A0, A3, 10, 4);
+ldrGruppe ldrUnten(A0, A1, 50, 2);
+ldrGruppe ldrLinks(A1, A2, 10, 5);
 
 // Variablen zum Vergleich der Stärke der LDRs, werden auf null initialisiert
 ldrGruppe* strongestLDRptr = nullptr;
@@ -209,15 +211,17 @@ void loop() {
   Serial.print("   Links: ");
   Serial.println(ldrLinks.getStrenght());*/
   Serial.println("*****");
-  Serial.println(ldrOben.getStrenght());
-  Serial.println(ldrRechts.getStrenght());
   Serial.println(ldrUnten.getStrenght());
   Serial.println(ldrLinks.getStrenght());
+  Serial.println(ldrOben.getStrenght());
+  Serial.println(ldrRechts.getStrenght());
   Serial.println("*****");
   Serial.println(analogRead(A0));
   Serial.println(analogRead(A1));
   Serial.println(analogRead(A2));
   Serial.println(analogRead(A3));
+  Serial.println("Moving Motor");
+  moveMotorByBits(strongestLDRptr->getMotorBits());
   //unsigned int output[] = ldrOben.getMotorBits();
   //Serial.println(output[1]);
   /*Serial.println("ON");
@@ -226,5 +230,22 @@ void loop() {
   Serial.println("OFF");
   mcp.digitalWrite(SUNRELAY_PIN, 0);
   delay(5000);*/
-  delay(1000);
+  delay(50);
+}
+
+void moveMotorByBits(int motorBits){
+  int direction = 0;
+  if(bitRead(motorBits, 0) == 1){
+    direction = -1;
+  }else{
+    direction = 1;
+  }
+  if(bitRead(motorBits, 1) == 1){
+    yMotor.move(direction);
+  }
+  else if(bitRead(motorBits, 2) == 1){
+    xMotor.move(direction);
+  }else{
+    Serial.println("Error in Reading Bits, not MotorBit specified!");
+  }
 }
