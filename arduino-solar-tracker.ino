@@ -20,14 +20,15 @@ int yMotorPin2 = 8;
 int yMotorPin3 = 7;
 int yMotorPin4 = 9;
 int sonnenMotorPin1 = 10;
-int sonnenMotorPin2 = 11;
-int sonnenMotorPin3 = 12;
+int sonnenMotorPin2 = 12;
+int sonnenMotorPin3 = 11;
 int sonnenMotorPin4 = 13;
 
 int xLimit = 0; //MCP ID GPA0
 int yLimit = 1; //^      GPA1
 int sonnenLimit = 2; // GPA2
 int maxSteps = 4096;
+long currentMillis = 0;
 unsigned int moveBits[3] = {0, 0, 0};
 
 Adafruit_MCP23X17 mcp;
@@ -37,9 +38,10 @@ Adafruit_MCP23X17 mcp;
 class Motor : public Stepper{
   private:
     int speed = MOTOR_SPEED;
-    int pos;
+    int pos = 0;
     int limitPin;
     int pin1, pin2, pin3, pin4;
+    int inverse = 0;
   public:
     Motor(int int1, int int2, int int3, int int4, int pin) : Stepper(maxSteps, int1, int2, int3, int4){
       limitPin = pin;
@@ -52,12 +54,21 @@ class Motor : public Stepper{
     // bewegen den Stepper soweit bis der Limit Switch berührt wird, das ist der nullpunkt
     void calibrate(){
       Serial.println("Calibrating...");
-      do{
-        step(2);
-        Serial.print(mcp.digitalRead(limitPin));
-        delay(100);
-      }while(mcp.digitalRead(limitPin)); //TODO: correct var
+      if(!inverse){
+        do{
+          step(2);
+          Serial.print(mcp.digitalRead(limitPin));
+          delay(100);
+        }while(mcp.digitalRead(limitPin));
+      }else{
+        do{
+          step(-2);
+          Serial.print(mcp.digitalRead(limitPin));
+          delay(100);
+        }while(mcp.digitalRead(limitPin));
+      }
       Serial.println("Calibrated!");
+      stop();
       pos = 0;
     };
     void move(int i){
@@ -65,20 +76,29 @@ class Motor : public Stepper{
         for(i; i>0;i--){
           step(1);
           pos++;
-          delay(50);
+          delay(20);
         }
       }
       else{
         for(i; i<0;i++){
           step(-1);
           pos--;
-          delay(50);
+          delay(20);
         }
       }
       stop();
     }
+    void setInverse(){
+      inverse = 1;
+    }
     void moveTo(int i){
+      Serial.print("Moving to:");
+      Serial.print(i);
+      Serial.print(" Current pos:");
+      Serial.print(pos);
+      Serial.print(" Moving by:");
       i = i - pos;
+      Serial.print(i);
       move(i);
     }
     int getPos(){
@@ -113,7 +133,7 @@ class ldrGruppe{
       offset = offsetValue;
     };
     int getStrenght(){
-      return int((analogRead(ldrPin1) + analogRead(ldrPin2)) / 2 - offset);
+      return int(((analogRead(ldrPin1) + analogRead(ldrPin2)) / 2) - offset);
     }
     unsigned int getMotorBits(){
       return moveBits;
@@ -125,10 +145,10 @@ class ldrGruppe{
 Motor xMotor(xMotorPin1, xMotorPin2, xMotorPin3, xMotorPin4, xLimit);
 Motor yMotor(yMotorPin1, yMotorPin2, yMotorPin3, yMotorPin4, yLimit);
 Motor sonne(sonnenMotorPin1, sonnenMotorPin2, sonnenMotorPin3, sonnenMotorPin4, sonnenLimit);
-ldrGruppe ldrOben(A2, A3, 50, 3);
-ldrGruppe ldrRechts(A0, A3, 10, 4);
-ldrGruppe ldrUnten(A0, A1, 50, 2);
-ldrGruppe ldrLinks(A1, A2, 10, 5);
+ldrGruppe ldrOben(A2, A3, 0, 3);
+ldrGruppe ldrRechts(A0, A3, 0, 4);
+ldrGruppe ldrUnten(A0, A1, 0, 2);
+ldrGruppe ldrLinks(A1, A2, 0, 5);
 
 // Variablen zum Vergleich der Stärke der LDRs, werden auf null initialisiert
 ldrGruppe* strongestLDRptr = nullptr;
@@ -156,23 +176,22 @@ void setup() {
   mcp.pinMode(sonnenLimit, INPUT_PULLUP);
   // configure pin for output
   mcp.pinMode(SUNRELAY_PIN, OUTPUT);
-  xMotor.setSpeed(10);
-  yMotor.setSpeed(10);
-  sonne.setSpeed(10);
-  xMotor.calibrate();
+  randomSeed(analogRead(0));
+  xMotor.setSpeed(20);
+  yMotor.setSpeed(20);
+  sonne.setSpeed(20);
+  sonne.setInverse();
+  /*xMotor.calibrate();
   delay(1000);
-  xMotor.stop();
-  yMotor.calibrate();
-  delay(1000);
-  yMotor.stop();
+  //yMotor.calibrate();
+  delay(1000);*/
   sonne.calibrate();
-  delay(1000);
-  sonne.stop();
   xMotor.move(-10);
   yMotor.move(-10);
 }
 
 void loop() {
+  
   // setzte einen Pointer auf die Instanz von ldrGruppe die die größte Stärke aufweist
   // dabei wir ldrOben als erstes als größte festgehalten weil es noch nichts zum vergleiche gibt
   // über if statements wird dann die Stärkste Instanz ermittelt und als strongestStrenght gespeichert, sowie ein Pointer "strongestLDRptr" auf die Instanz gesetzt
@@ -211,9 +230,13 @@ void loop() {
   Serial.print("   Links: ");
   Serial.println(ldrLinks.getStrenght());*/
   Serial.println("*****");
+  Serial.print("Unten: ");
   Serial.println(ldrUnten.getStrenght());
+  Serial.print("Links: ");
   Serial.println(ldrLinks.getStrenght());
+  Serial.print("Oben: ");
   Serial.println(ldrOben.getStrenght());
+  Serial.print("Rechts: ");
   Serial.println(ldrRechts.getStrenght());
   Serial.println("*****");
   Serial.println(analogRead(A0));
@@ -230,7 +253,17 @@ void loop() {
   Serial.println("OFF");
   mcp.digitalWrite(SUNRELAY_PIN, 0);
   delay(5000);*/
-  delay(50);
+  if(currentMillis < (millis() - 20000)){
+    mcp.digitalWrite(SUNRELAY_PIN, LOW);
+    sonne.moveTo(random(155,873));
+    mcp.digitalWrite(SUNRELAY_PIN, HIGH);
+    currentMillis = millis();
+  }
+  Serial.print("C:");
+  Serial.print(currentMillis/1000);
+  Serial.print("M:");
+  Serial.println(millis()/1000);
+  delay(20);
 }
 
 void moveMotorByBits(int motorBits){
